@@ -15,6 +15,7 @@
  */
 
 #include "base_fun.h"
+#include "config_plist_opt.h"
 
 /**
  * @brief 用户功能初始化
@@ -36,6 +37,9 @@ void user_fun_init(INT32 argc, INT8 *argv[])
 void user_system_init(INT32 argc, INT8 *argv[])
 {
 	user_fun_init(argc, argv);
+
+	plist_init("/Users/madongfang/Desktop/Hackintosh/config_plist/config.plist");
+	plist_print();
 
 	FOREVER
 	{

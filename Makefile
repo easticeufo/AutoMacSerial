@@ -21,6 +21,7 @@ LIBS += -lm
 SRCS := 
 SRCS += src/main.c
 SRCS += src/base_fun.c
+SRCS += src/config_plist_opt.c
 
 OBJS = $(SRCS:%.c=build/%.o)
 
