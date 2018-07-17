@@ -167,6 +167,7 @@ BOOL plist_init(const INT8 *p_config_plist_path)
         return FALSE;
     }
 
+    SAFE_CLOSE(fd);
     return TRUE;
 }
 
