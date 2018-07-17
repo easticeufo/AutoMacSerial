@@ -1,5 +1,9 @@
 #include "base_fun.h"
 
+#define XML_HEAD "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" \
+    "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+#define TAG_PLIST "<plist version=\"1.0\">"
+#define TAG_PLIST_END "</plist>"
 #define TAG_DICT "<dict>"
 #define TAG_DICT_END "</dict>"
 #define TAG_KEY "<key>"
@@ -10,6 +14,7 @@
 #define TAG_INT_END "</integer>"
 #define TAG_TRUE "<true/>"
 #define TAG_FALSE "<false/>"
+#define ELE_SMBIOS "SMBIOS"
 
 #define KEY_VALUE_TYPE_UNKNOWN 0
 #define KEY_VALUE_TYPE_INT 1
@@ -322,4 +327,76 @@ void plist_set_bool_value(const INT8 *p_key, BOOL bool_value)
     }
 
     return;
+}
+
+BOOL plist_save(const INT8 *p_config_plist_path)
+{
+    KEY_VALUE_NODE *p_node = p_key_value_root;
+    INT32 fd = -1;
+    INT8 int_string[16] = {0};
+
+    if (NULL == p_config_plist_path)
+    {
+        return FALSE;
+    }
+
+    if ((fd = open(p_config_plist_path, O_WRONLY | O_CREAT | O_TRUNC, 0777)) == ERROR)
+    {
+        DEBUG_PRINT(DEBUG_ERROR, "open failed:%s\n", strerror(errno));
+        return FALSE;
+    }
+
+    writen(fd, XML_HEAD, strlen(XML_HEAD));
+    writen(fd, TAG_PLIST"\n", strlen(TAG_PLIST"\n"));
+    writen(fd, TAG_DICT"\n", strlen(TAG_DICT"\n"));
+    writen(fd, "\t"TAG_KEY ELE_SMBIOS TAG_KEY_END"\n", strlen("\t"TAG_KEY ELE_SMBIOS TAG_KEY_END"\n"));
+    writen(fd, "\t"TAG_DICT"\n", strlen("\t"TAG_DICT"\n"));
+
+    while (p_node != NULL)
+    {
+        writen(fd, "\t\t"TAG_KEY, strlen("\t\t"TAG_KEY));
+        writen(fd, p_node->p_key, p_node->key_len);
+        writen(fd, TAG_KEY_END"\n", strlen(TAG_KEY_END"\n"));
+        switch (p_node->value_type)
+        {
+            case KEY_VALUE_TYPE_STRING:
+            if (p_node->p_string_value != NULL)
+            {
+                writen(fd, "\t\t"TAG_STRING, strlen("\t\t"TAG_STRING));
+                writen(fd, p_node->p_string_value, p_node->string_value_len);
+                writen(fd, TAG_STRING_END"\n", strlen(TAG_STRING_END"\n"));
+            }
+            break;
+
+            case KEY_VALUE_TYPE_INT:
+            writen(fd, "\t\t"TAG_INT, strlen("\t\t"TAG_INT));
+            snprintf(int_string, sizeof(int_string), "%d", p_node->int_value);
+            writen(fd, int_string, strlen(int_string));
+            writen(fd, TAG_INT_END"\n", strlen(TAG_INT_END"\n"));
+            break;
+
+            case KEY_VALUE_TYPE_BOOL:
+            if (p_node->bool_value)
+            {
+                writen(fd, "\t\t"TAG_TRUE"\n", strlen("\t\t"TAG_TRUE"\n"));
+            }
+            else
+            {
+                writen(fd, "\t\t"TAG_FALSE"\n", strlen("\t\t"TAG_FALSE"\n"));
+            }
+            break;
+
+            default:
+            break; 
+        }
+
+        p_node = p_node->p_next;
+    }
+
+    writen(fd, "\t"TAG_DICT_END"\n", strlen("\t"TAG_DICT_END"\n"));
+    writen(fd, TAG_DICT_END"\n", strlen(TAG_DICT_END"\n"));
+    writen(fd, TAG_PLIST_END"\n", strlen(TAG_PLIST_END"\n"));
+
+    SAFE_CLOSE(fd);
+    return TRUE;
 }
