@@ -23,7 +23,7 @@ typedef struct KEY_VALUE_NODE
     INT32 value_type;
     INT32 int_value;
     BOOL bool_value;
-	const INT8 *p_string_value;
+	INT8 *p_string_value;
     INT32 string_value_len;
 	BOOL need_free;
     struct KEY_VALUE_NODE *p_next;
@@ -71,7 +71,7 @@ static KEY_VALUE_NODE *parse_config_plist(const INT8 *p_buffer)
         if ((ptr = strstr(ptr_end, TAG_STRING)) != NULL && ptr < ptr_next)
         {
             p_node->value_type = KEY_VALUE_TYPE_STRING;
-            p_node->p_string_value = ptr + strlen(TAG_STRING);
+            p_node->p_string_value = (INT8 *)ptr + strlen(TAG_STRING);
             p_node->string_value_len = strstr(ptr, TAG_STRING_END) - p_node->p_string_value;
         }
         else if ((ptr = strstr(ptr_end, TAG_INT)) != NULL && ptr < ptr_next)
@@ -170,6 +170,27 @@ BOOL plist_init(const INT8 *p_config_plist_path)
     return TRUE;
 }
 
+void plist_destroy(void)
+{
+    KEY_VALUE_NODE *p_node = p_key_value_root;
+
+    while (p_node != NULL)
+    {
+        if (p_node->need_free)
+        {
+            SAFE_FREE(p_node->p_string_value);
+        }
+        p_node->need_free = FALSE;
+
+        p_node = p_node->p_next;
+    }
+
+    SAFE_FREE(p_key_value_root);
+    SAFE_FREE(p_config_plist_read_buffer);
+
+    return;
+}
+
 void plist_print(void)
 {
     KEY_VALUE_NODE *p_node = p_key_value_root;
@@ -214,6 +235,87 @@ void plist_print(void)
             break;
         }
         printf("\n");
+
+        p_node = p_node->p_next;
+    }
+
+    return;
+}
+
+void plist_set_string_value(const INT8 *p_key, const INT8 *p_string_value)
+{
+    KEY_VALUE_NODE *p_node = p_key_value_root;
+    INT32 key_len = strlen(p_key);
+    INT32 string_value_len = strlen(p_string_value);
+
+    while (p_node != NULL)
+    {
+        if (key_len == p_node->key_len && memcmp(p_key, p_node->p_key, key_len) == 0)
+        {
+            if (p_node->need_free)
+            {
+                SAFE_FREE(p_node->p_string_value);
+            }
+            p_node->value_type = KEY_VALUE_TYPE_STRING;
+            p_node->p_string_value = (INT8 *)malloc(string_value_len);
+            memcpy(p_node->p_string_value, p_string_value, string_value_len);
+            p_node->string_value_len = string_value_len;
+            p_node->need_free = TRUE;
+
+            break;
+        }
+
+        p_node = p_node->p_next;
+    }
+
+    return;
+}
+
+void plist_set_int_value(const INT8 *p_key, INT32 int_value)
+{
+    KEY_VALUE_NODE *p_node = p_key_value_root;
+    INT32 key_len = strlen(p_key);
+
+    while (p_node != NULL)
+    {
+        if (key_len == p_node->key_len && memcmp(p_key, p_node->p_key, key_len) == 0)
+        {
+            if (p_node->need_free)
+            {
+                SAFE_FREE(p_node->p_string_value);
+            }
+            p_node->need_free = FALSE;
+            p_node->value_type = KEY_VALUE_TYPE_INT;
+            p_node->int_value = int_value;
+
+            break;
+        }
+
+        p_node = p_node->p_next;
+    }
+
+    return;
+}
+
+void plist_set_bool_value(const INT8 *p_key, BOOL bool_value)
+{
+    KEY_VALUE_NODE *p_node = p_key_value_root;
+    INT32 key_len = strlen(p_key);
+
+    while (p_node != NULL)
+    {
+        if (key_len == p_node->key_len && memcmp(p_key, p_node->p_key, key_len) == 0)
+        {
+            if (p_node->need_free)
+            {
+                SAFE_FREE(p_node->p_string_value);
+            }
+            p_node->need_free = FALSE;
+            p_node->value_type = KEY_VALUE_TYPE_BOOL;
+            p_node->bool_value = bool_value;
+
+            break;
+        }
 
         p_node = p_node->p_next;
     }
