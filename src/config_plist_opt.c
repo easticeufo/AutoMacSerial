@@ -6,13 +6,25 @@
 #define TAG_KEY_END "</key>"
 #define TAG_STRING "<string>"
 #define TAG_STRING_END "</string>"
+#define TAG_INT "<integer>"
+#define TAG_INT_END "</integer>"
+#define TAG_TRUE "<true/>"
+#define TAG_FALSE "<false/>"
+
+#define KEY_VALUE_TYPE_UNKNOWN 0
+#define KEY_VALUE_TYPE_INT 1
+#define KEY_VALUE_TYPE_BOOL 2
+#define KEY_VALUE_TYPE_STRING 3
 
 typedef struct KEY_VALUE_NODE
 {
 	const INT8 *p_key;
     INT32 key_len;
-	const INT8 *p_value;
-    INT32 value_len;
+    INT32 value_type;
+    INT32 int_value;
+    BOOL bool_value;
+	const INT8 *p_string_value;
+    INT32 string_value_len;
 	BOOL need_free;
     struct KEY_VALUE_NODE *p_next;
 }KEY_VALUE_NODE;
@@ -23,6 +35,7 @@ static KEY_VALUE_NODE *p_key_value_root = NULL;
 static KEY_VALUE_NODE *parse_config_plist(const INT8 *p_buffer)
 {
     const INT8 *ptr = NULL;
+    const INT8 *ptr_next = NULL;
     const INT8 *ptr_end = NULL;
     KEY_VALUE_NODE *p_root = NULL;
     KEY_VALUE_NODE *p_node = NULL;
@@ -42,16 +55,43 @@ static KEY_VALUE_NODE *parse_config_plist(const INT8 *p_buffer)
         return NULL;
     }
 
-    while ((ptr = strstr(ptr, TAG_KEY)) != NULL && (ptr_end = strstr(ptr, TAG_KEY_END)) != NULL)
+    while (ptr != NULL && (ptr = strstr(ptr, TAG_KEY)) != NULL && (ptr_end = strstr(ptr, TAG_KEY_END)) != NULL)
     {
         p_node = (KEY_VALUE_NODE *)malloc(sizeof(KEY_VALUE_NODE));
         memset(p_node, 0, sizeof(KEY_VALUE_NODE));
         p_node->p_key = ptr + strlen(TAG_KEY);
         p_node->key_len = ptr_end - p_node->p_key;
-        if ((ptr = strstr(ptr_end, TAG_STRING)) != NULL && (ptr_end = strstr(ptr, TAG_STRING_END)) != NULL)
+
+        ptr_end = ptr_end + strlen(TAG_KEY_END);
+        ptr_next = strstr(ptr_end, TAG_KEY); // get next <key> tag position
+        if (NULL == ptr_next)
         {
-            p_node->p_value = ptr + strlen(TAG_STRING);
-            p_node->value_len = ptr_end - p_node->p_value;
+            ptr_next = strstr(ptr_end, TAG_DICT_END);
+        }
+        if ((ptr = strstr(ptr_end, TAG_STRING)) != NULL && ptr < ptr_next)
+        {
+            p_node->value_type = KEY_VALUE_TYPE_STRING;
+            p_node->p_string_value = ptr + strlen(TAG_STRING);
+            p_node->string_value_len = strstr(ptr, TAG_STRING_END) - p_node->p_string_value;
+        }
+        else if ((ptr = strstr(ptr_end, TAG_INT)) != NULL && ptr < ptr_next)
+        {
+            p_node->value_type = KEY_VALUE_TYPE_INT;
+            p_node->int_value = atoi(ptr + strlen(TAG_INT));
+        }
+        else if ((ptr = strstr(ptr_end, TAG_TRUE)) != NULL && ptr < ptr_next)
+        {
+            p_node->value_type = KEY_VALUE_TYPE_BOOL;
+            p_node->bool_value = TRUE;
+        }
+        else if ((ptr = strstr(ptr_end, TAG_FALSE)) != NULL && ptr < ptr_next)
+        {
+            p_node->value_type = KEY_VALUE_TYPE_BOOL;
+            p_node->bool_value = FALSE;
+        }
+        else
+        {
+            p_node->value_type = KEY_VALUE_TYPE_UNKNOWN;
         }
 
         if (NULL == p_root)
@@ -143,12 +183,35 @@ void plist_print(void)
             printf("%c", *(p_node->p_key + i));
         }
         printf("=");
-        if (p_node->p_value != NULL)
+        switch (p_node->value_type)
         {
-            for (i = 0; i < p_node->value_len; i++)
+            case KEY_VALUE_TYPE_STRING:
+            if (p_node->p_string_value != NULL)
             {
-                printf("%c", *(p_node->p_value + i));
+                for (i = 0; i < p_node->string_value_len; i++)
+                {
+                    printf("%c", *(p_node->p_string_value + i));
+                }
             }
+            break;
+
+            case KEY_VALUE_TYPE_INT:
+            printf("%d", p_node->int_value);
+            break;
+
+            case KEY_VALUE_TYPE_BOOL:
+            if (p_node->bool_value)
+            {
+                printf("true");
+            }
+            else
+            {
+                printf("false");
+            }
+            break;
+
+            default:
+            break;
         }
         printf("\n");
 
