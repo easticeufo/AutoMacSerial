@@ -17,14 +17,42 @@
 #include "base_fun.h"
 #include "config_plist_opt.h"
 
+#define BOARD_SERIAL_NUMBER "C02708404OPF5041H"
+#define SERIAL_NUMBER "C02T910SH1DP"
+#define CONFIG_PLIST_FILE_PATH "/Volumes/EFI/EFI/CLOVER/config.plist"
+
 /**
  * @brief 用户功能初始化
  * @param[in] argc 命令行中参数的个数
  * @param[in] argv 命令行参数数组
  * @return 无
  */
-void user_fun_init(INT32 argc, INT8 *argv[])
+void user_fun(INT32 argc, INT8 *argv[])
 {
+	system("diskutil mount disk0s1");
+	sleep(3);
+
+	if (!plist_init(CONFIG_PLIST_FILE_PATH))
+	{
+		return;
+	}
+	plist_set_string_value("BoardSerialNumber", BOARD_SERIAL_NUMBER);
+	plist_set_string_value("SerialNumber", SERIAL_NUMBER);
+	if (!plist_save(CONFIG_PLIST_FILE_PATH))
+	{
+		plist_destroy();
+		return;
+	}
+	plist_destroy();
+	sync();
+
+	sleep(2);
+
+	if (reboot(RB_AUTOBOOT) == ERROR) // 成功重启此函数不会返回
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "reboot failed: %s\n", strerror(errno));
+	}
+
 	return;
 }
 
@@ -36,15 +64,8 @@ void user_fun_init(INT32 argc, INT8 *argv[])
  */
 void user_system_init(INT32 argc, INT8 *argv[])
 {
-	user_fun_init(argc, argv);
-
-	plist_init("/Users/madongfang/Desktop/Hackintosh/config_plist/config.plist");
-	plist_print();
-
-	FOREVER
-	{
-		sleep(100000);
-	}
+	user_fun(argc, argv);
+	return;
 }
 
 void print_usage(INT8 *name)

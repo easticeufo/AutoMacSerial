@@ -16,7 +16,7 @@
 
 #include "base_fun.h"
 
-static INT32 debug_level = DEBUG_NOTICE; // 调试打印信息输出等级
+static INT32 debug_level = DEBUG_WARN; // 调试打印信息输出等级
 
 /**		  
  * @brief 获取调试打印信息输出等级
