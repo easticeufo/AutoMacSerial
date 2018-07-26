@@ -92,6 +92,9 @@ extern INT32 get_mac_addr(const INT8 *p_interface_name, UINT8 *p_mac_addr, INT32
 extern INT32 unix_recv_socket_init(const INT8 *p_path);
 extern INT32 recv_dgram(INT32 fd, void *p_buff, INT32 buff_len);
 extern BOOL socket_recv_empty(INT32 sock_fd);
+extern INT32 base64_encode(const UINT8 * sourcedata, INT8 * base64);
+extern INT32 base64_decode(const INT8 * base64, UINT8 * dedata);
+extern INT32 str2hex(const INT8 *str, INT32 strlen, UINT8 *hex, INT32 hexlen);
 
 #endif
 

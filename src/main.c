@@ -17,9 +17,10 @@
 #include "base_fun.h"
 #include "config_plist_opt.h"
 
-#define BOARD_SERIAL_NUMBER "C02708404OPF5041H"
-#define SERIAL_NUMBER "C02T910SH1DP"
+#define BOARD_SERIAL_NUMBER "C0732950A19F1HCAF"
+#define SERIAL_NUMBER "C07L40J4H884"
 #define CONFIG_PLIST_FILE_PATH "/Volumes/EFI/EFI/CLOVER/config.plist"
+#define ROM_ID "44FB4292D612"
 
 /**
  * @brief 用户功能初始化
@@ -29,6 +30,9 @@
  */
 void user_fun(INT32 argc, INT8 *argv[])
 {
+	UINT8 rom[8] = {0};
+	INT32 len = 0;
+	INT8 rom_base64[16] = {0};
 	system("diskutil mount disk0s1");
 	sleep(3);
 
@@ -36,6 +40,10 @@ void user_fun(INT32 argc, INT8 *argv[])
 	{
 		return;
 	}
+
+	len = str2hex(ROM_ID, strlen(ROM_ID), rom, sizeof(rom));
+	base64_encode(rom, rom_base64);
+	plist_set_data_value("ROM", rom_base64);
 	plist_set_string_value("BoardSerialNumber", BOARD_SERIAL_NUMBER);
 	plist_set_string_value("SerialNumber", SERIAL_NUMBER);
 	if (!plist_save(CONFIG_PLIST_FILE_PATH))
@@ -44,6 +52,8 @@ void user_fun(INT32 argc, INT8 *argv[])
 		return;
 	}
 	plist_destroy();
+
+	system("diskutil umount disk0s1");
 	sync();
 
 	sleep(2);

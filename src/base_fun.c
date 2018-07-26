@@ -18,6 +18,9 @@
 
 static INT32 debug_level = DEBUG_WARN; // 调试打印信息输出等级
 
+static const INT8 *base64char = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const INT8 padding_char = '=';
+
 /**		  
  * @brief 获取调试打印信息输出等级
  * @param 无
@@ -422,4 +425,140 @@ BOOL socket_recv_empty(INT32 sock_fd)
 	{
 		return TRUE;
 	}
+}
+
+/*编码代码
+* const UINT8 * sourcedata， 源数组
+* INT8 base64 ，码字保存
+*/
+INT32 base64_encode(const UINT8 * sourcedata, INT8 * base64)
+{
+    INT32 i=0, j=0;
+    UINT8 trans_index=0;    // 索引是8位，但是高两位都为0
+    const INT32 datalength = strlen((const INT8*)sourcedata);
+    for (; i < datalength; i += 3){
+        // 每三个一组，进行编码
+        // 要编码的数字的第一个
+        trans_index = ((sourcedata[i] >> 2) & 0x3f);
+        base64[j++] = base64char[(int)trans_index];
+        // 第二个
+        trans_index = ((sourcedata[i] << 4) & 0x30);
+        if (i + 1 < datalength){
+            trans_index |= ((sourcedata[i + 1] >> 4) & 0x0f);
+            base64[j++] = base64char[(int)trans_index];
+        }else{
+            base64[j++] = base64char[(int)trans_index];
+
+            base64[j++] = padding_char;
+
+            base64[j++] = padding_char;
+
+            break;   // 超出总长度，可以直接break
+        }
+        // 第三个
+        trans_index = ((sourcedata[i + 1] << 2) & 0x3c);
+        if (i + 2 < datalength){ // 有的话需要编码2个
+            trans_index |= ((sourcedata[i + 2] >> 6) & 0x03);
+            base64[j++] = base64char[(int)trans_index];
+
+            trans_index = sourcedata[i + 2] & 0x3f;
+            base64[j++] = base64char[(int)trans_index];
+        }
+        else{
+            base64[j++] = base64char[(int)trans_index];
+
+            base64[j++] = padding_char;
+
+            break;
+        }
+    }
+
+    base64[j] = '\0'; 
+
+    return 0;
+}
+
+/** 在字符串中查询特定字符位置索引
+* const char *str ，字符串
+* char c，要查找的字符
+*/
+static INT32 num_strchr(const INT8 *str, INT8 c) // 
+{
+    const INT8 *pindex = strchr(str, c);
+    if (NULL == pindex){
+        return -1;
+    }
+    return pindex - str;
+}
+
+/* 解码
+* const INT8 * base64 码字
+* UINT8 * dedata， 解码恢复的数据
+*/
+INT32 base64_decode(const INT8 * base64, UINT8 * dedata)
+{
+    INT32 i = 0, j=0;
+    INT32 trans[4] = {0,0,0,0};
+    for (;base64[i]!='\0';i+=4){
+        // 每四个一组，译码成三个字符
+        trans[0] = num_strchr(base64char, base64[i]);
+        trans[1] = num_strchr(base64char, base64[i+1]);
+        // 1/3
+        dedata[j++] = ((trans[0] << 2) & 0xfc) | ((trans[1]>>4) & 0x03);
+
+        if (base64[i+2] == '='){
+            continue;
+        }
+        else{
+            trans[2] = num_strchr(base64char, base64[i + 2]);
+        }
+        // 2/3
+        dedata[j++] = ((trans[1] << 4) & 0xf0) | ((trans[2] >> 2) & 0x0f);
+
+        if (base64[i + 3] == '='){
+            continue;
+        }
+        else{
+            trans[3] = num_strchr(base64char, base64[i + 3]);
+        }
+
+        // 3/3
+        dedata[j++] = ((trans[2] << 6) & 0xc0) | (trans[3] & 0x3f);
+    }
+
+    dedata[j] = '\0';
+
+    return 0;
+}
+
+INT32 str2hex(const INT8 *str, INT32 strlen, UINT8 *hex, INT32 hexlen)
+{
+	INT32 i = 0;
+	INT32 tmp = 0;
+	
+	if (NULL == str || NULL == hex || 0 == hexlen)
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "param error\n");
+		return ERROR;
+	}
+
+	if (strlen % 2 == 1)
+	{
+		sscanf(str, "%1x", &tmp);
+		str++;
+		strlen--;
+		hex[i] = tmp;
+		i++;
+	}
+
+	while (strlen > 0 && i < hexlen)
+	{
+		sscanf(str, "%2x", &tmp);
+		str += 2;
+		strlen -= 2;
+		hex[i] = tmp;
+		i++;
+	}
+
+	return i;
 }
