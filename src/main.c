@@ -17,10 +17,84 @@
 #include "base_fun.h"
 #include "config_plist_opt.h"
 
-#define BOARD_SERIAL_NUMBER "C0732950A19F1HCAF"
-#define SERIAL_NUMBER "C07L40J4H884"
 #define CONFIG_PLIST_FILE_PATH "/Volumes/EFI/EFI/CLOVER/config.plist"
-#define ROM_ID "44FB4292D612"
+#define SERVER_ADDR "13.209.75.83"
+#define SERVER_PORT 19871
+
+#define CMD_GET_5CODES "5codes"
+
+BOOL get_hardware_code_string(INT8 *p_buff, INT32 buff_len)
+{
+	INT32 sock_fd = 0;
+	INT32 head = 0;
+	INT32 recv_len = 0;
+	struct sockaddr_in server_addr;
+
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(SERVER_PORT);
+	inet_pton(AF_INET, SERVER_ADDR, &server_addr.sin_addr);
+
+	sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (ERROR == sock_fd)
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "socket failed: %s\n", strerror(errno));
+		return FALSE;
+	}
+
+	if (connect(sock_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == ERROR)
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "connect failed: %s\n", strerror(errno));
+		SAFE_CLOSE(sock_fd);
+		return FALSE;
+	}
+	
+	/* 发送请求命令 */
+	head = htonl(strlen(CMD_GET_5CODES));
+	if (writen(sock_fd, &head, 4) < 0)
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "sock_fd writen failed!\n");
+		SAFE_CLOSE(sock_fd);
+		return FALSE;
+	}
+	if (writen(sock_fd, CMD_GET_5CODES, strlen(CMD_GET_5CODES)) < 0)
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "sock_fd writen failed!\n");
+		SAFE_CLOSE(sock_fd);
+		return FALSE;
+	}
+
+	/* 接收响应 */
+	if (readn(sock_fd, &head, 4) != 4)
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "readn failed!\n");
+		SAFE_CLOSE(sock_fd);
+		return FALSE;
+	}
+	recv_len = ntohl(head);
+	memset(p_buff, 0, buff_len);
+	if (recv_len < buff_len)
+	{
+		if (readn(sock_fd, p_buff, recv_len) != recv_len)
+		{
+			DEBUG_PRINT(DEBUG_ERROR, "readn failed!\n");
+			SAFE_CLOSE(sock_fd);
+			return FALSE;
+		}
+	}
+	else
+	{
+		if (readn(sock_fd, p_buff, buff_len-1) != (buff_len-1))
+		{
+			DEBUG_PRINT(DEBUG_ERROR, "readn failed!\n");
+			SAFE_CLOSE(sock_fd);
+			return FALSE;
+		}
+	}
+
+	SAFE_CLOSE(sock_fd);
+	return TRUE;
+}
 
 /**
  * @brief 用户功能初始化
@@ -30,9 +104,49 @@
  */
 void user_fun(INT32 argc, INT8 *argv[])
 {
+	INT8 hardware_code_string[128] = {0};
+	INT8 *p_rom = NULL;
+	INT8 *p_board_serial_number = NULL;
+	INT8 *p_serial_number = NULL;
+	INT8 *ptr = NULL;
 	UINT8 rom[8] = {0};
 	INT32 len = 0;
 	INT8 rom_base64[16] = {0};
+
+	if (!get_hardware_code_string(hardware_code_string, sizeof(hardware_code_string)))
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "get_hardware_code_string failed\n");
+		return;
+	}
+
+	DEBUG_PRINT(DEBUG_NOTICE, "get_hardware_code_string=%s\n", hardware_code_string);
+	ptr = strchr(hardware_code_string, ':');
+	if (NULL == ptr)
+	{
+		DEBUG_PRINT(DEBUG_NOTICE, "there is no more hardware code\n");
+		return;
+	}
+	*ptr = '\0';
+	p_rom = hardware_code_string;
+	p_board_serial_number = ptr + 1;
+	ptr = strchr(p_board_serial_number, ':');
+	if (NULL == ptr)
+	{
+		DEBUG_PRINT(DEBUG_WARN, "hardware_code_string format error\n");
+		return;
+	}
+	*ptr = '\0';
+	p_serial_number = ptr + 1;
+	ptr = strchr(p_serial_number, ':');
+	if (NULL == ptr)
+	{
+		DEBUG_PRINT(DEBUG_WARN, "hardware_code_string format error\n");
+		return;
+	}
+	*ptr = '\0';
+	DEBUG_PRINT(DEBUG_NOTICE, "rom=%s,board_serial_number=%s,serial_number=%s\n", 
+		p_rom, p_board_serial_number, p_serial_number);
+
 	system("diskutil mount disk0s1");
 	sleep(3);
 
@@ -41,11 +155,11 @@ void user_fun(INT32 argc, INT8 *argv[])
 		return;
 	}
 
-	len = str2hex(ROM_ID, strlen(ROM_ID), rom, sizeof(rom));
+	len = str2hex(p_rom, strlen(p_rom), rom, sizeof(rom));
 	base64_encode(rom, rom_base64);
 	plist_set_data_value("ROM", rom_base64);
-	plist_set_string_value("BoardSerialNumber", BOARD_SERIAL_NUMBER);
-	plist_set_string_value("SerialNumber", SERIAL_NUMBER);
+	plist_set_string_value("BoardSerialNumber", p_board_serial_number);
+	plist_set_string_value("SerialNumber", p_serial_number);
 	if (!plist_save(CONFIG_PLIST_FILE_PATH))
 	{
 		plist_destroy();

@@ -237,7 +237,7 @@ BOOL plist_init(const INT8 *p_config_plist_path)
         return FALSE;
     }
 
-    DEBUG_PRINT(DEBUG_NOTICE, "config.plist:\n%s\n", p_config_plist_read_buffer);
+    DEBUG_PRINT(DEBUG_INFO, "config.plist:\n%s\n", p_config_plist_read_buffer);
 
     p_key_value_root = parse_config_plist(p_config_plist_read_buffer);
     if (NULL == p_key_value_root)
