@@ -2,6 +2,14 @@
 
 #define XML_HEAD "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" \
     "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+#define XML_CLOVER_BOOT "\t<key>Boot</key>\n" \
+	"\t<dict>\n" \
+	"\t\t<key>DefaultVolume</key>\n" \
+	"\t\t<string>LastBootedVolume</string>\n" \
+	"\t\t<key>Fast</key>\n" \
+	"\t\t<true/>\n" \
+	"\t</dict>\n"
+
 #define TAG_PLIST "<plist version=\"1.0\">"
 #define TAG_PLIST_END "</plist>"
 #define TAG_DICT "<dict>"
@@ -451,6 +459,7 @@ BOOL plist_save(const INT8 *p_config_plist_path)
     writen(fd, XML_HEAD, strlen(XML_HEAD));
     writen(fd, TAG_PLIST"\n", strlen(TAG_PLIST"\n"));
     writen(fd, TAG_DICT"\n", strlen(TAG_DICT"\n"));
+    writen(fd, XML_CLOVER_BOOT, strlen(XML_CLOVER_BOOT));
 
     if (p_node != NULL && 3 == p_node->key_len && memcmp(p_node->p_key, "ROM", p_node->key_len) == 0)
     {
