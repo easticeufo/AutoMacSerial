@@ -112,6 +112,21 @@ void user_fun(INT32 argc, INT8 *argv[])
 	UINT8 rom[8] = {0};
 	INT32 len = 0;
 	INT8 rom_base64[16] = {0};
+	INT32 i = 0;
+	INT8 *p_external_program_path = NULL;
+
+	for (i = 1; i < argc; i++)
+	{
+		if (strcmp(argv[i], "-e") == 0)
+		{
+			i++;
+			if (i < argc)
+			{
+				p_external_program_path = argv[i];
+			}
+			break;
+		}
+	}
 
 	if (!get_hardware_code_string(hardware_code_string, sizeof(hardware_code_string)))
 	{
@@ -168,10 +183,15 @@ void user_fun(INT32 argc, INT8 *argv[])
 	plist_destroy();
 
 	system("diskutil umount disk0s1");
+
+	if (NULL != p_external_program_path)
+	{
+		sleep(2);
+		system(p_external_program_path);
+	}
+
 	sync();
-
 	sleep(2);
-
 	if (reboot(RB_AUTOBOOT) == ERROR) // 成功重启此函数不会返回
 	{
 		DEBUG_PRINT(DEBUG_ERROR, "reboot failed: %s\n", strerror(errno));
@@ -230,6 +250,7 @@ INT32 main(INT32 argc, INT8 *argv[])
 				return ERROR;
 			}
 			set_debug_level(atoi(argv[i]));
+			break;
 		}
 	}
 	
