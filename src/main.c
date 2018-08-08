@@ -23,6 +23,32 @@
 
 #define CMD_GET_5CODES "5codes"
 
+static BOOL get_sm_uuid(INT8 *p_buff, INT32 buff_len)
+{
+	FILE *fp = NULL;
+	fp = popen("uuidgen", "r");
+	if (NULL == fp)
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "popen uuidgen failed: %s\n", strerror(errno));
+		return FALSE;
+	}
+
+	if (NULL == fgets(p_buff, buff_len, fp))
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "fgets failed: %s\n", strerror(errno));
+		pclose(fp);
+		return FALSE;
+	}
+
+	if ('\n' == p_buff[strlen(p_buff) - 1])
+	{
+		p_buff[strlen(p_buff) - 1] = '\0';
+	}
+
+	pclose(fp);
+	return TRUE;
+}
+
 BOOL get_hardware_code_string(INT8 *p_buff, INT32 buff_len)
 {
 	INT32 sock_fd = 0;
@@ -112,6 +138,7 @@ void user_fun(INT32 argc, INT8 *argv[])
 	UINT8 rom[8] = {0};
 	INT32 len = 0;
 	INT8 rom_base64[16] = {0};
+	INT8 sm_uuid[64] = {0};
 	INT32 i = 0;
 	INT8 *p_external_program_path = NULL;
 
@@ -175,6 +202,12 @@ void user_fun(INT32 argc, INT8 *argv[])
 	plist_set_data_value("ROM", rom_base64);
 	plist_set_string_value("BoardSerialNumber", p_board_serial_number);
 	plist_set_string_value("SerialNumber", p_serial_number);
+	if (get_sm_uuid(sm_uuid, sizeof(sm_uuid)))
+	{
+		DEBUG_PRINT(DEBUG_NOTICE, "get_sm_uuid sm_uuid=%s\n", sm_uuid);
+		plist_set_string_value("SmUUID", sm_uuid);
+	}
+
 	if (!plist_save(CONFIG_PLIST_FILE_PATH))
 	{
 		plist_destroy();
@@ -183,18 +216,12 @@ void user_fun(INT32 argc, INT8 *argv[])
 	plist_destroy();
 
 	system("diskutil umount disk0s1");
+	sync();
 
 	if (NULL != p_external_program_path)
 	{
 		sleep(2);
 		system(p_external_program_path);
-	}
-
-	sync();
-	sleep(2);
-	if (reboot(RB_AUTOBOOT) == ERROR) // 成功重启此函数不会返回
-	{
-		DEBUG_PRINT(DEBUG_ERROR, "reboot failed: %s\n", strerror(errno));
 	}
 
 	return;
