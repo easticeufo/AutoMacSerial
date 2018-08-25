@@ -21,7 +21,7 @@
 #define SERVER_ADDR "13.209.75.83"
 #define SERVER_PORT 19871
 
-#define CMD_GET_5CODES "5codes"
+#define CMD_USE_INFO "useInfo"
 
 static BOOL get_sm_uuid(INT8 *p_buff, INT32 buff_len)
 {
@@ -76,14 +76,14 @@ BOOL get_hardware_code_string(INT8 *p_buff, INT32 buff_len)
 	}
 	
 	/* 发送请求命令 */
-	head = htonl(strlen(CMD_GET_5CODES));
+	head = htonl(strlen(p_buff));
 	if (writen(sock_fd, &head, 4) < 0)
 	{
 		DEBUG_PRINT(DEBUG_ERROR, "sock_fd writen failed!\n");
 		SAFE_CLOSE(sock_fd);
 		return FALSE;
 	}
-	if (writen(sock_fd, CMD_GET_5CODES, strlen(CMD_GET_5CODES)) < 0)
+	if (writen(sock_fd, p_buff, strlen(p_buff)) < 0)
 	{
 		DEBUG_PRINT(DEBUG_ERROR, "sock_fd writen failed!\n");
 		SAFE_CLOSE(sock_fd);
@@ -130,10 +130,11 @@ BOOL get_hardware_code_string(INT8 *p_buff, INT32 buff_len)
  */
 void user_fun(INT32 argc, INT8 *argv[])
 {
-	INT8 hardware_code_string[128] = {0};
+	INT8 send_recv_buff[256] = {0};
 	INT8 *p_rom = NULL;
 	INT8 *p_board_serial_number = NULL;
 	INT8 *p_serial_number = NULL;
+	INT8 *p_sm_uuid = NULL;
 	INT8 *ptr = NULL;
 	UINT8 rom[8] = {0};
 	INT32 len = 0;
@@ -155,21 +156,32 @@ void user_fun(INT32 argc, INT8 *argv[])
 		}
 	}
 
-	if (!get_hardware_code_string(hardware_code_string, sizeof(hardware_code_string)))
+	if (!get_sm_uuid(sm_uuid, sizeof(sm_uuid)))
+	{
+		DEBUG_PRINT(DEBUG_ERROR, "get_sm_uuid failed\n");
+		return;
+	}
+	else
+	{
+		DEBUG_PRINT(DEBUG_NOTICE, "get_sm_uuid sm_uuid=%s\n", sm_uuid);
+	}
+
+	snprintf(send_recv_buff, sizeof(send_recv_buff), "%s:%s", CMD_USE_INFO, sm_uuid);
+	if (!get_hardware_code_string(send_recv_buff, sizeof(send_recv_buff)))
 	{
 		DEBUG_PRINT(DEBUG_ERROR, "get_hardware_code_string failed\n");
 		return;
 	}
 
-	DEBUG_PRINT(DEBUG_NOTICE, "get_hardware_code_string=%s\n", hardware_code_string);
-	ptr = strchr(hardware_code_string, ':');
+	DEBUG_PRINT(DEBUG_NOTICE, "send_recv_buff=%s\n", send_recv_buff);
+	ptr = strchr(send_recv_buff, ':');
 	if (NULL == ptr)
 	{
 		DEBUG_PRINT(DEBUG_NOTICE, "there is no more hardware code\n");
 		return;
 	}
 	*ptr = '\0';
-	p_rom = hardware_code_string;
+	p_rom = send_recv_buff;
 	p_board_serial_number = ptr + 1;
 	ptr = strchr(p_board_serial_number, ':');
 	if (NULL == ptr)
@@ -186,8 +198,16 @@ void user_fun(INT32 argc, INT8 *argv[])
 		return;
 	}
 	*ptr = '\0';
-	DEBUG_PRINT(DEBUG_NOTICE, "rom=%s,board_serial_number=%s,serial_number=%s\n", 
-		p_rom, p_board_serial_number, p_serial_number);
+	p_sm_uuid = ptr + 1;
+	ptr = strchr(p_sm_uuid, ':');
+	if (NULL == ptr)
+	{
+		DEBUG_PRINT(DEBUG_WARN, "hardware_code_string format error\n");
+		return;
+	}
+	*ptr = '\0';
+	DEBUG_PRINT(DEBUG_NOTICE, "rom=%s,board_serial_number=%s,serial_number=%s,sm_uuid=%s\n", 
+		p_rom, p_board_serial_number, p_serial_number, p_sm_uuid);
 
 	system("diskutil mount disk0s1");
 	sleep(3);
@@ -202,11 +222,7 @@ void user_fun(INT32 argc, INT8 *argv[])
 	plist_set_data_value("ROM", rom_base64);
 	plist_set_string_value("BoardSerialNumber", p_board_serial_number);
 	plist_set_string_value("SerialNumber", p_serial_number);
-	if (get_sm_uuid(sm_uuid, sizeof(sm_uuid)))
-	{
-		DEBUG_PRINT(DEBUG_NOTICE, "get_sm_uuid sm_uuid=%s\n", sm_uuid);
-		plist_set_string_value("SmUUID", sm_uuid);
-	}
+	plist_set_string_value("SmUUID", p_sm_uuid);
 
 	if (!plist_save(CONFIG_PLIST_FILE_PATH))
 	{
